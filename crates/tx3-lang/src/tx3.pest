@@ -26,7 +26,7 @@ primitive_type = {
 custom_type = { identifier }
 list_type = { "List<" ~ type ~ ">" }
 
-type = { 
+type = {
     primitive_type |
     list_type |
     custom_type
@@ -38,7 +38,7 @@ parameter_list = { "(" ~ (parameter ~ ("," ~ parameter)* ~ ","?)? ~ ")" }
 
 // Asset definitions
 asset_def = {
-    "asset" ~ identifier ~ "=" ~ hex_string ~ "." ~ ascii_text ~ ";"
+    "asset" ~ identifier ~ "=" ~ hex_string ~ ("." ~ ascii_text)? ~ ";"
 }
 
 // Party definitions

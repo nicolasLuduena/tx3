@@ -7,6 +7,7 @@ use std::collections::HashSet;
 use std::ops::Deref;
 
 use crate::ast;
+use crate::ast::AssetName;
 use crate::ir;
 use crate::UtxoRef;
 
@@ -356,7 +357,15 @@ impl IntoLower for ast::StaticAssetConstructor {
         };
 
         let asset_name = match asset_def.asset_name {
-            Some(x) => ir::Expression::Bytes(x.as_bytes().to_vec()),
+            Some(x) => match x {
+                AssetName::Named(Some(asset_name)) => {
+                    ir::Expression::Bytes(asset_name.as_bytes().to_vec())
+                }
+                AssetName::Named(None) => ir::Expression::Bytes(vec![]),
+                AssetName::HexString(asset_name) => {
+                    ir::Expression::Bytes(hex::decode(&asset_name.value)?)
+                }
+            },
             None => ir::Expression::None,
         };
 

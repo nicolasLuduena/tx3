@@ -85,6 +85,8 @@ fn compile_native_asset_for_output(
     ir: &ir::AssetExpr,
 ) -> Result<primitives::Multiasset<primitives::PositiveCoin>, Error> {
     let policy = coercion::expr_into_bytes(&ir.policy)?;
+    println!("-------------------------policy: {:?}", policy);
+    println!("-------------------------IR policy: {:?}", &ir.policy);
     let policy = primitives::Hash::from(policy.as_slice());
     let asset_name = coercion::expr_into_bytes(&ir.asset_name)?;
     let amount = coercion::expr_into_number(&ir.amount)?;
@@ -318,7 +320,7 @@ fn compile_tx_body(
         mint: compile_mint_block(tx)?,
         reference_inputs: primitives::NonEmptySet::from_vec(compile_reference_inputs(tx)?),
         network_id: Some(network),
-        ttl: None,
+        ttl: Some(81896624),
         validity_interval_start: None,
         withdrawals: None,
         auxiliary_data_hash: None,
@@ -493,7 +495,7 @@ fn compile_witness_set(
 
 fn infer_plutus_version(_transaction_body: &primitives::TransactionBody) -> PlutusVersion {
     // TODO: infer plutus version from existing scripts
-    1
+    2
 }
 
 fn compute_script_data_hash(

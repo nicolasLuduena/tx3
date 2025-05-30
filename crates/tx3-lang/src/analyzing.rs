@@ -1,6 +1,6 @@
 //! Semantic analysis of the Tx3 language.
 //!
-//! This module takes an AST and performs semantic analysis on it. It checks for
+//! This module takes an T and performs semantic analysis on it. It checks for
 //! duplicate definitions, unknown symbols, and other semantic errors.
 
 use std::{collections::HashMap, rc::Rc};

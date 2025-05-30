@@ -1197,17 +1197,38 @@ impl AstNode for AssetDef {
     const RULE: Rule = Rule::asset_def;
 
     fn parse(pair: Pair<Rule>) -> Result<Self, Error> {
-        let span = pair.as_span().into();
+        let span: Span = pair.as_span().into();
         let mut inner = pair.into_inner();
 
         let identifier = inner.next().unwrap().as_str().to_string();
-        let policy = HexStringLiteral::parse(inner.next().unwrap())?;
-        let asset_name = inner.next().unwrap().as_str().to_string();
+        let mut policy = HexStringLiteral::parse(inner.next().unwrap().clone())?;
+        let mut asset_name = None;
+
+        if policy.value.len() == 56 {
+            asset_name = Some(AssetName::Named(Some(
+                inner.next().unwrap().as_str().to_string(),
+            )));
+        } else if policy.value.len() > 56 {
+            let policy_copy = policy.clone();
+            let (policy_str, asset) = policy_copy.value.split_at(56);
+            policy = HexStringLiteral::new(policy_str);
+            asset_name = Some(AssetName::HexString(HexStringLiteral::new(asset)));
+        } else {
+            return Err(Error {
+                message: format!(
+                    "Invalid asset definition: policy string is too short: {}",
+                    policy.value
+                ),
+                src: "".to_string(),
+                span: span.clone(),
+            });
+        }
+        println!("+++++++++++++++++++++++++Policy value: {}", policy.value);
 
         Ok(AssetDef {
             name: identifier,
             policy: Some(policy),
-            asset_name: Some(asset_name),
+            asset_name: asset_name,
             span,
         })
     }

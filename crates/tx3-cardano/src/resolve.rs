@@ -87,6 +87,7 @@ pub async fn resolve_tx<T: Ledger>(
 
     // one initial pass to reduce any available params;
     let tx = tx.apply()?;
+    dbg!(&tx);
 
     while let Some(better) = eval_pass(&tx, &pparams, &ledger, last_eval.fee).await? {
         last_eval = better;
