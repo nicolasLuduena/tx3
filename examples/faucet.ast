@@ -150,6 +150,7 @@
           }
         }
       ],
+      "validity": null,
       "burn": null,
       "mints": [
         {
@@ -203,13 +204,15 @@
           }
         }
       ],
+      "req_signers": [],
       "adhoc": [],
       "span": {
         "dummy": false,
         "start": 188,
         "end": 523
       },
-      "collateral": []
+      "collateral": [],
+      "metadata": null
     }
   ],
   "types": [],

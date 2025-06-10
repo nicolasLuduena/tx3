@@ -602,6 +602,7 @@
           }
         }
       ],
+      "validity": null,
       "burn": {
         "fields": [
           {
@@ -641,13 +642,15 @@
         }
       },
       "mints": [],
+      "req_signers": [],
       "adhoc": [],
       "span": {
         "dummy": false,
         "start": 569,
         "end": 1445
       },
-      "collateral": []
+      "collateral": [],
+      "metadata": null
     }
   ],
   "types": [

@@ -533,15 +533,18 @@
           }
         }
       ],
+      "validity": null,
       "burn": null,
       "mints": [],
+      "req_signers": [],
       "adhoc": [],
       "span": {
         "dummy": false,
         "start": 161,
         "end": 767
       },
-      "collateral": []
+      "collateral": [],
+      "metadata": null
     }
   ],
   "types": [

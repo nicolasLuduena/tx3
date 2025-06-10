@@ -35,7 +35,7 @@ tx new_order() {
 
     input payment {
         from: Sender,
-        min_amount: fees + Bid(1) + Ada(2000000),
+        min_amount: fees + Bid(1) + Ada(3000000),
     }
 
     collateral {
@@ -70,5 +70,8 @@ tx new_order() {
                 name: "CONTROL",
             },
         },
+    }
+    metadata {
+        674: "SOME METADATA",
     }
 }
