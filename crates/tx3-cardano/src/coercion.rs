@@ -125,6 +125,10 @@ pub fn expr_into_stake_credential(
             let address = bytes_into_address(x)?;
             address_into_stake_credential(&address)
         }
+        ir::Expression::String(x) => {
+            let address = string_into_address(x)?;
+            address_into_stake_credential(&address)
+        }
         _ => Err(Error::CoerceError(
             format!("{:?}", expr),
             "StakeCredential".to_string(),
@@ -151,10 +155,7 @@ pub fn expr_into_address(
 pub fn expr_into_bytes(ir: &ir::Expression) -> Result<primitives::Bytes, Error> {
     match ir {
         ir::Expression::Bytes(x) => Ok(primitives::Bytes::from(x.clone())),
-        ir::Expression::String(s) => match hex::decode(s) {
-            Ok(x) => Ok(primitives::Bytes::from(x)),
-            Err(_) => Err(Error::CoerceError(format!("{:?}", ir), "Bytes".to_string())),
-        },
+        ir::Expression::String(s) => Ok(primitives::Bytes::from(s.as_bytes().to_vec())),
         _ => Err(Error::CoerceError(format!("{:?}", ir), "Bytes".to_string())),
     }
 }

@@ -3,9 +3,10 @@ use std::collections::BTreeMap;
 use pallas::{
     codec::utils::{KeepRaw, MaybeIndefArray},
     ledger::{
+        addresses::{Address, ShelleyPaymentPart},
         primitives::{
             conway::{self as primitives, NonEmptySet, Redeemers},
-            TransactionInput,
+            Coin, TransactionInput,
         },
         traverse::ComputeHash,
     },
@@ -311,6 +312,48 @@ fn compile_collateral(tx: &ir::Tx) -> Option<NonEmptySet<TransactionInput>> {
         .flatten()
 }
 
+fn compile_required_signers(tx: &ir::Tx) -> Result<Option<primitives::RequiredSigners>, Error> {
+    let mut hashes = Vec::new();
+    let Some(signers) = &tx.signers else {
+        return Ok(primitives::RequiredSigners::from_vec(hashes));
+    };
+
+    for signer in &signers.signers {
+        match signer {
+            ir::Expression::String(s) => {
+                let signer_addr = coercion::string_into_address(s)?;
+                let Address::Shelley(addr) = signer_addr else {
+                    return Err(Error::CoerceError(
+                        format!("{:?}", signer),
+                        "Shelley address".to_string(),
+                    ));
+                };
+
+                let ShelleyPaymentPart::Key(key) = addr.payment() else {
+                    return Err(Error::CoerceError(
+                        format!("{:?}", signer),
+                        "Key payment credential".to_string(),
+                    ));
+                };
+
+                hashes.push(*key);
+            }
+            ir::Expression::Bytes(b) => {
+                let bytes = primitives::Bytes::from(b.clone());
+                hashes.push(primitives::AddrKeyhash::from(bytes.as_slice()));
+            }
+            _ => {
+                return Err(Error::CoerceError(
+                    format!("{:?}", signer),
+                    "Signer".to_string(),
+                ));
+            }
+        }
+    }
+
+    Ok(primitives::RequiredSigners::from_vec(hashes))
+}
+
 fn compile_validity(validity: Option<&ir::Validity>) -> Result<(Option<u64>, Option<u64>), Error> {
     let since = validity
         .and_then(|v| v.since.as_ref())
@@ -341,11 +384,11 @@ fn compile_tx_body(
         network_id: Some(network),
         ttl: until,
         validity_interval_start: since,
-        withdrawals: None,
+        withdrawals: compile_withdrawals(tx)?,
         auxiliary_data_hash: None,
         script_data_hash: None,
         collateral: compile_collateral(tx),
-        required_signers: None,
+        required_signers: compile_required_signers(tx)?,
         collateral_return: None,
         total_collateral: None,
         voting_procedures: None,
@@ -570,4 +613,49 @@ pub fn compile_tx(tx: &ir::Tx, pparams: &PParams) -> Result<primitives::Tx<'stat
         auxiliary_data: primitives::Nullable::from(auxiliary_data.map(KeepRaw::from)),
         success: true,
     })
+}
+
+pub fn compile_withdrawals(
+    tx: &ir::Tx,
+) -> Result<Option<BTreeMap<primitives::Bytes, Coin>>, Error> {
+    let mut withdrawals = BTreeMap::new();
+
+    for adhoc in tx.adhoc.iter().filter(|x| x.name.as_str() == "withdraw") {
+        for (key, value) in adhoc.data.iter() {
+            if key.starts_with("withdraw_") {
+                let index = key.strip_prefix("withdraw_").unwrap();
+                let amount_key = format!("amount_{}", index);
+
+                if let Some(amount_expr) = adhoc.data.get(&amount_key) {
+                    let stake_credential = coercion::expr_into_stake_credential(value)?;
+                    let hash_bytes = match stake_credential {
+                        primitives::StakeCredential::AddrKeyhash(x) => {
+                            primitives::Bytes::from(x.to_vec())
+                        }
+                        primitives::StakeCredential::ScriptHash(x) => {
+                            primitives::Bytes::from(x.to_vec())
+                        }
+                    };
+
+                    let amount = coercion::expr_into_number(amount_expr);
+
+                    if let Ok(amount) = amount {
+                        let amount = primitives::Coin::try_from(amount as u64).unwrap();
+                        withdrawals.insert(hash_bytes, amount);
+                    } else {
+                        return Err(Error::CoerceError(
+                            format!("{:?}", amount_expr),
+                            "Number".to_string(),
+                        ));
+                    }
+                }
+            }
+        }
+    }
+
+    if withdrawals.is_empty() {
+        Ok(None)
+    } else {
+        Ok(Some(withdrawals))
+    }
 }
