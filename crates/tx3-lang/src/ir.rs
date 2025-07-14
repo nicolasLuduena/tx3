@@ -181,6 +181,7 @@ pub enum Type {
     UtxoRef,
     AnyAsset,
     List,
+    Map,
     Custom(String),
 }
 
@@ -196,6 +197,7 @@ pub enum Param {
 pub enum Expression {
     None,
     List(Vec<Expression>),
+    Map(Vec<(Expression, Expression)>),
     Tuple(Box<(Expression, Expression)>),
     Struct(StructExpr),
     Bytes(Vec<u8>),
