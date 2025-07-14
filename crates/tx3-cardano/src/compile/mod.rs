@@ -78,7 +78,9 @@ fn compile_data_expr(ir: &ir::Expression) -> Result<primitives::PlutusData, Erro
         ir::Expression::Bool(x) => Ok(x.as_data()),
         ir::Expression::String(x) => Ok(x.as_str().as_data()),
         ir::Expression::Struct(x) => compile_struct(x),
+        ir::Expression::Map(x) => x.try_as_data(),
         ir::Expression::Address(x) => Ok(x.as_data()),
+        ir::Expression::List(x) => x.try_as_data(),
         _ => Err(Error::CoerceError(
             format!("{ir:?}"),
             "DataExpr".to_string(),
@@ -614,7 +616,7 @@ fn compile_withdrawal_redeemers(
     let redeemers = tx
         .adhoc
         .iter()
-        .filter(|x| x.name.as_str() == "withdraw")
+        .filter(|x| x.name.as_str() == "withdrawal")
         .map(|adhoc| compile_single_withdrawal_redeemer(adhoc, compiled_body, network))
         .filter_map(|x| x.transpose())
         .collect::<Result<Vec<_>, _>>()?;
@@ -766,7 +768,7 @@ fn infer_plutus_version(witness_set: &primitives::WitnessSet) -> PlutusVersion {
     } else {
         // TODO: should we error here?
         // Defaulting to Plutus V2 for now
-        1
+        2
     }
 }
 
