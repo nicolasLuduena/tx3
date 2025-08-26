@@ -3,7 +3,10 @@
 //! This module takes an AST and performs lowering on it. It converts the AST
 //! into the intermediate representation (IR) of the Tx3 language.
 
+use std::ops::Deref;
+
 use crate::ast;
+use crate::ast::DataExpr;
 use crate::ir;
 use crate::UtxoRef;
 
@@ -478,8 +481,17 @@ impl IntoLower for ast::AnyAssetConstructor {
     type Output = ir::Expression;
 
     fn into_lower(&self, ctx: &Context) -> Result<Self::Output, Error> {
-        let policy = self.policy.into_lower(ctx)?;
-        let asset_name = self.asset_name.into_lower(ctx)?;
+        fn lower_or_none(expr: Box<DataExpr>, ctx: &Context) -> Result<ir::Expression, Error> {
+            if let ast::DataExpr::String(s) = expr.deref() {
+                if s.value.is_empty() {
+                    return Ok(ir::Expression::None);
+                }
+            }
+            expr.into_lower(ctx)
+        }
+
+        let policy = lower_or_none(self.policy.clone(), ctx)?;
+        let asset_name = lower_or_none(self.asset_name.clone(), ctx)?;
         let amount = self.amount.into_lower(ctx)?;
 
         Ok(ir::Expression::Assets(vec![ir::AssetExpr {
@@ -906,4 +918,6 @@ mod tests {
     test_lowering!(min_utxo);
 
     test_lowering!(list_concat);
+
+    test_lowering!(map);
 }
