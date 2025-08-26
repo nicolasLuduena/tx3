@@ -1,7 +1,10 @@
 use std::collections::{BTreeMap, HashMap, HashSet};
 
-use crate::{backend, ir, ArgValue, CanonicalAssets, Utxo};
-use crate::ir::Expression;
+use crate::{
+    backend,
+    ir::{self, Expression},
+    ArgValue, CanonicalAssets, Utxo,
+};
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
@@ -189,7 +192,7 @@ impl Concatenable for Vec<Expression> {
         match other {
             Expression::List(expressions) => {
                 Ok(Expression::List([&self[..], &expressions[..]].concat()))
-            },
+            }
             _ => Err(Error::InvalidBinaryOp(
                 "concat".to_string(),
                 format!("List({:?})", self),
@@ -569,6 +572,11 @@ impl Composite for ir::AssetExpr {
             amount: f(self.amount)?,
         })
     }
+    fn reduce_self(self) -> Result<Self, Error> {
+        let canonical: CanonicalAssets = self.into();
+        let asset: Vec<ir::AssetExpr> = canonical.into();
+        Ok(asset.get(0).unwrap().clone())
+    }
 }
 
 impl Composite for ir::Coerce {
@@ -598,7 +606,7 @@ impl Composite for ir::Coerce {
             Self::NoOp(x) => Ok(Self::NoOp(x)),
             Self::IntoAssets(x) => Ok(Self::NoOp(x.into_assets()?)),
             Self::IntoDatum(x) => Ok(Self::NoOp(x.into_datum()?)),
-            Self::IntoScript(x) => todo!(),
+            Self::IntoScript(_x) => todo!(),
         }
     }
 }
@@ -665,7 +673,6 @@ impl From<ir::AssetExpr> for CanonicalAssets {
 impl From<Vec<ir::AssetExpr>> for CanonicalAssets {
     fn from(assets: Vec<ir::AssetExpr>) -> Self {
         let mut result = CanonicalAssets::empty();
-
         for asset in assets {
             let asset = asset.into();
             result = result + asset;
@@ -683,7 +690,10 @@ impl From<CanonicalAssets> for Vec<ir::AssetExpr> {
             result.push(ir::AssetExpr {
                 policy: class
                     .policy()
-                    .map(|x| ir::Expression::Bytes(x.to_vec()))
+                    .map(|x| match x.is_empty() {
+                        true => ir::Expression::None,
+                        false => ir::Expression::Bytes(x.to_vec()),
+                    })
                     .unwrap_or(ir::Expression::None),
                 asset_name: class
                     .name()
@@ -692,7 +702,6 @@ impl From<CanonicalAssets> for Vec<ir::AssetExpr> {
                 amount: ir::Expression::Number(amount),
             });
         }
-
         result
     }
 }
@@ -701,7 +710,10 @@ impl ir::AssetExpr {
     fn expect_constant_policy(&self) -> Option<&[u8]> {
         match &self.policy {
             ir::Expression::None => None,
-            ir::Expression::Bytes(x) => Some(x.as_slice()),
+            ir::Expression::Bytes(x) => match x.is_empty() {
+                true => None,
+                false => Some(x.as_slice()),
+            },
             _ => None,
         }
     }
@@ -709,7 +721,10 @@ impl ir::AssetExpr {
     fn expect_constant_name(&self) -> Option<&[u8]> {
         match &self.asset_name {
             ir::Expression::None => None,
-            ir::Expression::Bytes(x) => Some(x.as_slice()),
+            ir::Expression::Bytes(x) => match x.is_empty() {
+                true => None,
+                false => Some(x.as_slice()),
+            },
             ir::Expression::String(x) => Some(x.as_bytes()),
             _ => None,
         }
@@ -856,7 +871,12 @@ impl Apply for ir::Expression {
             )))),
             Self::Map(x) => Ok(Self::Map(
                 x.into_iter()
-                    .map(|(k, v)| Ok((k.apply_args(args)?, v.apply_args(args)?)))
+                    .map(|(k, v)| {
+                        Ok::<(Expression, Expression), Error>((
+                            k.apply_args(args)?,
+                            v.apply_args(args)?,
+                        ))
+                    })
                     .collect::<Result<_, _>>()?,
             )),
             Self::Struct(x) => Ok(Self::Struct(x.apply_args(args)?)),
@@ -895,7 +915,12 @@ impl Apply for ir::Expression {
             )),
             Self::Map(x) => Ok(Self::Map(
                 x.into_iter()
-                    .map(|(k, v)| Ok((k.apply_inputs(args)?, v.apply_inputs(args)?)))
+                    .map(|(k, v)| {
+                        Ok::<(Expression, Expression), Error>((
+                            k.apply_inputs(args)?,
+                            v.apply_inputs(args)?,
+                        ))
+                    })
                     .collect::<Result<_, _>>()?,
             )),
             Self::Tuple(x) => Ok(Self::Tuple(Box::new((
@@ -938,7 +963,12 @@ impl Apply for ir::Expression {
             )),
             Self::Map(x) => Ok(Self::Map(
                 x.into_iter()
-                    .map(|(k, v)| Ok((k.apply_fees(fees)?, v.apply_fees(fees)?)))
+                    .map(|(k, v)| {
+                        Ok::<(Expression, Expression), Error>((
+                            k.apply_fees(fees)?,
+                            v.apply_fees(fees)?,
+                        ))
+                    })
                     .collect::<Result<_, _>>()?,
             )),
             Self::Tuple(x) => Ok(Self::Tuple(Box::new((
@@ -1075,7 +1105,7 @@ impl Apply for ir::Expression {
             )),
             ir::Expression::Map(x) => Ok(Self::Map(
                 x.into_iter()
-                    .map(|(k, v)| Ok((k.reduce()?, v.reduce()?)))
+                    .map(|(k, v)| Ok::<(Expression, Expression), Error>((k.reduce()?, v.reduce()?)))
                     .collect::<Result<_, _>>()?,
             )),
             ir::Expression::Tuple(x) => Ok(Self::Tuple(Box::new((x.0.reduce()?, x.1.reduce()?)))),
@@ -1907,8 +1937,9 @@ mod tests {
         let reduced = op.reduce().unwrap();
 
         match reduced {
-            ir::Expression::List(b) => assert_eq!(b, vec![
-                Expression::Number(1), Expression::Number(2)]),
+            ir::Expression::List(b) => {
+                assert_eq!(b, vec![Expression::Number(1), Expression::Number(2)])
+            }
             _ => panic!("Expected List [Number(1), Number(2)"),
         }
     }
